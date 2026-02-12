@@ -4,7 +4,7 @@
 
 A NixOS module for deploying [OpenClaw](https://github.com/openclaw/openclaw) with security defaults that actually make sense. Because 15,200 exposed control panels on the public internet is not a configuration choice — it's a crisis.
 
-> Presented at **SCaLE 23x / PlanetNix** · March 5–8, 2026 · Pasadena, CA
+> Built for the NixOS community
 
 ---
 
@@ -209,4 +209,4 @@ MIT
 
 ---
 
-*Built by [Scout-DJ](https://github.com/Scout-DJ) · Presented at PlanetNix @ SCaLE 23x · March 2026*
+*Built by [Scout-DJ](https://github.com/Scout-DJ) · [substation.ninja](https://substation.ninja)*
