@@ -65,6 +65,8 @@ Walks you through domain, API keys, Telegram/Discord setup, and generates a read
       system = "x86_64-linux";
       modules = [
         openclaw.nixosModules.default
+        # Apply the overlay so pkgs.openclaw is available
+        { nixpkgs.overlays = [ openclaw.overlays.default ]; }
         ./configuration.nix
       ];
     };
@@ -114,6 +116,26 @@ sudo nixos-rebuild switch --flake .#myhost
 
 ```bash
 sudo cat /var/lib/openclaw/auth-token
+```
+
+## OpenClaw Package
+
+The flake **includes the OpenClaw package** — no separate install needed. It's fetched from npm at build time and wrapped as a proper Nix derivation.
+
+Three ways it works:
+
+1. **Apply the overlay** (recommended): Add `{ nixpkgs.overlays = [ openclaw.overlays.default ]; }` to your modules — `pkgs.openclaw` is then available everywhere.
+
+2. **Auto-fallback**: If you don't apply the overlay, the module auto-builds OpenClaw from npm using the version specified in `services.openclaw.version`.
+
+3. **BYO package**: Set `services.openclaw.package` to your own derivation if you need a custom build.
+
+```nix
+# Override the version if needed
+services.openclaw.version = "2026.2.6-3";
+
+# Or bring your own package
+services.openclaw.package = myCustomOpenclawPkg;
 ```
 
 ## Module Options

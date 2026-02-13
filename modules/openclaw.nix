@@ -26,8 +26,29 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.openclaw or (throw "OpenClaw package not found. Add it to your nixpkgs overlay or set services.openclaw.package.");
-      description = "The OpenClaw package to use.";
+      default = pkgs.openclaw or (pkgs.stdenv.mkDerivation rec {
+        pname = "openclaw";
+        version = cfg.version;
+        nativeBuildInputs = with pkgs; [ nodejs_22 cacert ];
+        buildInputs = with pkgs; [ nodejs_22 ];
+        dontUnpack = true;
+        buildPhase = ''
+          export HOME=$TMPDIR
+          export npm_config_cache=$TMPDIR/npm-cache
+          mkdir -p $npm_config_cache
+          npm install --global --prefix=$out openclaw@${version}
+        '';
+        installPhase = ''
+          mkdir -p $out/bin
+          for f in $out/lib/node_modules/.bin/*; do
+            name=$(basename $f)
+            [ ! -e "$out/bin/$name" ] && ln -sf "$f" "$out/bin/$name"
+          done
+        '';
+        meta.description = "OpenClaw agent infrastructure";
+      });
+      defaultText = lib.literalExpression "pkgs.openclaw (auto-built from npm if not in nixpkgs)";
+      description = "The OpenClaw package to use. Auto-fetched from npm if not provided.";
     };
 
     version = lib.mkOption {

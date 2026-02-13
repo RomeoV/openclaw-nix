@@ -15,12 +15,63 @@
       nixosModules.default = import ./modules/openclaw.nix;
       nixosModules.openclaw = import ./modules/openclaw.nix;
 
+      # Overlay that provides pkgs.openclaw
+      overlays.default = final: prev: {
+        openclaw = self.packages.${final.system}.openclaw;
+      };
+
       # Standalone packages
       packages = forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+
+          # OpenClaw package — built from npm
+          openclawPkg = pkgs.stdenv.mkDerivation rec {
+            pname = "openclaw";
+            version = "2026.2.6-3";
+
+            # We fetch from npm at build time
+            nativeBuildInputs = with pkgs; [ nodejs_22 cacert ];
+            buildInputs = with pkgs; [ nodejs_22 ];
+
+            # No source — we install from npm
+            dontUnpack = true;
+
+            buildPhase = ''
+              export HOME=$TMPDIR
+              export npm_config_cache=$TMPDIR/npm-cache
+              mkdir -p $npm_config_cache
+
+              # Install OpenClaw globally to a local prefix
+              npm install --global --prefix=$out openclaw@${version}
+            '';
+
+            installPhase = ''
+              # npm install --global --prefix already puts things in $out
+              # Ensure the bin directory exists and is linked
+              mkdir -p $out/bin
+
+              # Create wrapper that sets NODE_PATH
+              for f in $out/lib/node_modules/.bin/*; do
+                name=$(basename $f)
+                if [ ! -e "$out/bin/$name" ]; then
+                  ln -sf "$f" "$out/bin/$name"
+                fi
+              done
+            '';
+
+            meta = with pkgs.lib; {
+              description = "OpenClaw — AI agent infrastructure platform";
+              homepage = "https://github.com/openclaw/openclaw";
+              license = licenses.asl20;
+              platforms = platforms.linux;
+            };
+          };
         in
         {
+          # The OpenClaw package itself
+          openclaw = openclawPkg;
+
           # Quick setup script
           quick-setup = pkgs.writeShellScriptBin "openclaw-setup" (builtins.readFile ./scripts/quick-setup.sh);
 
