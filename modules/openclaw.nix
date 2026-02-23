@@ -228,9 +228,9 @@ in
           "@system-service"
           "~@privileged"
           "~@resources"
-          "fchown"  # libuv copyfile needs fchown to preserve ownership
         ];
-        CapabilityBoundingSet = "CAP_CHOWN CAP_FOWNER";
+        SystemCallErrorNumber = "EPERM";  # return EPERM instead of killing (libuv handles fchown failure gracefully)
+        CapabilityBoundingSet = "";
         AmbientCapabilities = "";
         UMask = "0077";
       };
