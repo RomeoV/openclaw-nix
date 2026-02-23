@@ -24,55 +24,82 @@
       packages = forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          nodejs = pkgs.nodejs_22;
 
-          # OpenClaw package — built from npm
-          openclawPkg = pkgs.stdenv.mkDerivation rec {
-            pname = "openclaw";
-            version = "2026.2.6-3";
+          version = "2026.2.6-3";
 
-            # We fetch from npm at build time
-            nativeBuildInputs = with pkgs; [ nodejs_22 cacert ];
-            buildInputs = with pkgs; [ nodejs_22 ];
-
-            # No source — we install from npm
-            dontUnpack = true;
-
-            buildPhase = ''
-              export HOME=$TMPDIR
-              export npm_config_cache=$TMPDIR/npm-cache
-              mkdir -p $npm_config_cache
-
-              # Install OpenClaw globally to a local prefix
-              npm install --global --prefix=$out openclaw@${version}
-            '';
-
+          # Combine tarball + lockfile into a proper source
+          openclawSrc = pkgs.stdenv.mkDerivation {
+            name = "openclaw-src-${version}";
+            src = pkgs.fetchurl {
+              url = "https://registry.npmjs.org/openclaw/-/openclaw-${version}.tgz";
+              hash = "sha256-zDMRFzjdetdw0Q47uqCIKHoqV7UwjxKnS6L9u2VoTJM=";
+            };
+            phases = [ "unpackPhase" "installPhase" ];
             installPhase = ''
-              # npm install --global --prefix already puts things in $out
-              # Ensure the bin directory exists and is linked
-              mkdir -p $out/bin
+              cp -r . $out
+              cp ${./package-lock.json} $out/package-lock.json
+            '';
+            sourceRoot = "package";
+          };
 
-              # Create wrapper that sets NODE_PATH
-              for f in $out/lib/node_modules/.bin/*; do
-                name=$(basename $f)
-                if [ ! -e "$out/bin/$name" ]; then
-                  ln -sf "$f" "$out/bin/$name"
-                fi
-              done
+          openclawPkg = pkgs.buildNpmPackage {
+            pname = "openclaw";
+            inherit version;
+
+            src = openclawSrc;
+
+            # Generated with: prefetch-npm-deps package-lock.json
+            npmDepsHash = "sha256-NPUq7InJJI00fVhmN6VUVcR7+lZrgl6AFNPdRYGb/Ms=";
+
+            nodejs = nodejs;
+
+            # Skip native compilation of optional deps (node-llama-cpp, etc)
+            # Sharp will use prebuilt binaries
+            npmFlags = [ "--ignore-scripts" "--legacy-peer-deps" ];
+            makeCacheWritable = true;
+
+            nativeBuildInputs = with pkgs; [
+              python3
+              pkg-config
+              makeWrapper
+            ];
+
+            buildInputs = with pkgs; [
+              vips  # for sharp prebuilt binaries
+            ];
+
+            # The package is pre-built (dist/ included in npm tarball)
+            # so we just need to install deps and create wrappers
+            dontNpmBuild = true;
+
+            postInstall = ''
+              # sharp needs its platform-specific prebuilt binary
+              # Run install/check to download it (network allowed in this phase
+              # only if using --impure; otherwise sharp falls back gracefully)
+              cd $out/lib/node_modules/openclaw
+              ${nodejs}/bin/node node_modules/sharp/install/check.js 2>/dev/null || true
+
+              # Ensure the openclaw binary wrapper exists
+              mkdir -p $out/bin
+              rm -f $out/bin/openclaw 2>/dev/null || true
+              makeWrapper "${nodejs}/bin/node" "$out/bin/openclaw" \
+                --add-flags "$out/lib/node_modules/openclaw/openclaw.mjs" \
+                --set NODE_PATH "$out/lib/node_modules"
             '';
 
             meta = with pkgs.lib; {
               description = "OpenClaw — AI agent infrastructure platform";
               homepage = "https://github.com/openclaw/openclaw";
-              license = licenses.asl20;
+              license = licenses.mit;
               platforms = platforms.linux;
+              mainProgram = "openclaw";
             };
           };
         in
         {
-          # The OpenClaw package itself
           openclaw = openclawPkg;
 
-          # Quick setup script
           quick-setup = pkgs.writeShellScriptBin "openclaw-setup" (builtins.readFile ./scripts/quick-setup.sh);
 
           default = pkgs.writeShellScriptBin "openclaw-nix" ''
@@ -112,7 +139,6 @@
           '';
         });
 
-      # nix run github:Scout-DJ/openclaw-nix
       apps = forAllSystems (system: {
         default = {
           type = "app";
