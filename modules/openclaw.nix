@@ -228,8 +228,9 @@ in
           "@system-service"
           "~@privileged"
           "~@resources"
+          "fchown"  # libuv copyfile needs fchown to preserve ownership
         ];
-        CapabilityBoundingSet = "";
+        CapabilityBoundingSet = "CAP_CHOWN CAP_FOWNER";
         AmbientCapabilities = "";
         UMask = "0077";
       };
