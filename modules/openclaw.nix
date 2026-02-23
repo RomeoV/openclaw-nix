@@ -195,7 +195,7 @@ in
 
       serviceConfig = {
         Type = "simple";
-        ExecStart = "${cfg.package}/bin/openclaw gateway start --config ${gatewayConfigFile}";
+        ExecStart = "${cfg.package}/bin/openclaw gateway";
         Restart = "on-failure";
         RestartSec = 5;
         WorkingDirectory = cfg.dataDir;
@@ -216,7 +216,7 @@ in
         ProtectControlGroups = true;
         ProtectClock = true;
         ProtectHostname = true;
-        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
+        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" "AF_NETLINK" ];
         RestrictNamespaces = true;
         RestrictRealtime = true;
         RestrictSUIDSGID = true;
@@ -234,10 +234,16 @@ in
         UMask = "0077";
       };
 
+      serviceConfig.EnvironmentFile = lib.optional (cfg.modelApiKeyFile != null) cfg.modelApiKeyFile
+        ++ lib.optional (cfg.telegram.enable && cfg.telegram.tokenFile != null) cfg.telegram.tokenFile
+        ++ lib.optional (cfg.discord.enable && cfg.discord.tokenFile != null) cfg.discord.tokenFile;
+
       environment = lib.mkMerge [
         {
           OPENCLAW_HOST = "127.0.0.1";
           OPENCLAW_PORT = toString cfg.gatewayPort;
+          OPENCLAW_CONFIG_PATH = "${cfg.dataDir}/openclaw.json";
+          HOME = cfg.dataDir;
           NODE_ENV = "production";
         }
         (lib.mkIf (cfg.modelApiKeyFile != null) {
