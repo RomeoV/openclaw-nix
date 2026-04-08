@@ -243,7 +243,6 @@ in
         {
           OPENCLAW_HOST = "127.0.0.1";
           OPENCLAW_PORT = toString cfg.gatewayPort;
-          OPENCLAW_CONFIG_PATH = "${cfg.dataDir}/openclaw.json";
           HOME = cfg.dataDir;
           NODE_ENV = "production";
         }
